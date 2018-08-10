@@ -1,0 +1,195 @@
+From 95b00a0d04eb67da7995016a15059f4404349a7d Mon Sep 17 00:00:00 2001
+From: Kaidax <kaidaxofficial@gmail.com>
+Date: Wed, 7 Mar 2018 10:33:12 +0000
+Subject: [PATCH] breaking
+
+---
+ .../izumi/distage/DefaultBootstrapContext.scala    |  2 +-
+ .../ReflectionProviderAbstractImpl.scala           |  2 +-
+ .../DependencyKeyProviderDefaultImpl.scala         | 56 ++++++++++++----------
+ .../reflection/ReflectionProviderDefaultImpl.scala |  2 +-
+ .../reflection/SymbolIntrospectorDefaultImpl.scala |  2 +-
+ .../model/reflection/DependencyKeyProvider.scala   | 21 ++++++--
+ 6 files changed, 51 insertions(+), 34 deletions(-)
+
+diff --git a/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/DefaultBootstrapContext.scala b/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/DefaultBootstrapContext.scala
+index a2556bb..d76a47a 100644
+--- a/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/DefaultBootstrapContext.scala
++++ b/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/DefaultBootstrapContext.scala
+@@ -44,7 +44,7 @@ trait DefaultBootstrapContext extends AbstractLocator {
+     , bind[PlanningHook, PlanningHookDefaultImpl]
+     , bind[PlanningObsever, PlanningObserverDefaultImpl]
+     , bind[PlanResolver, PlanResolverDefaultImpl]
+-    , bind[DependencyKeyProvider, DependencyKeyProviderDefaultImpl]
++    , bind[DependencyKeyProvider.Java, DependencyKeyProviderDefaultImpl.Java]
+     , bind[PlanAnalyzer, PlanAnalyzerDefaultImpl]
+     , bind[PlanMergingPolicy, PlanMergingPolicyDefaultImpl]
+     , bind[TheFactoryOfAllTheFactories, TheFactoryOfAllTheFactoriesDefaultImpl]
+diff --git a/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderAbstractImpl.scala b/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderAbstractImpl.scala
+index 09bffdc..3d59a65 100644
+--- a/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderAbstractImpl.scala
++++ b/distage/distage-core/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderAbstractImpl.scala
+@@ -9,7 +9,7 @@ import com.github.pshirshov.izumi.fundamentals.reflection.AnnotationTools
+ 
+ trait ReflectionProviderAbstractImpl extends ReflectionProvider.Java {
+   def symbolIntrospector: SymbolIntrospector.Java
+-  def keyProvider: DependencyKeyProviderDefaultImpl
++  def keyProvider: DependencyKeyProviderDefaultImpl.Java
+ 
+   import u._
+ 
+diff --git a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/DependencyKeyProviderDefaultImpl.scala b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/DependencyKeyProviderDefaultImpl.scala
+index 56ca536..8ad3156 100644
+--- a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/DependencyKeyProviderDefaultImpl.scala
++++ b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/DependencyKeyProviderDefaultImpl.scala
+@@ -2,35 +2,37 @@ package com.github.pshirshov.izumi.distage.reflection
+ 
+ import com.github.pshirshov.izumi.distage.model.definition.Id
+ import com.github.pshirshov.izumi.distage.model.reflection.DependencyKeyProvider
+-import com.github.pshirshov.izumi.distage.model.reflection.universe.RuntimeUniverse
+-import com.github.pshirshov.izumi.distage.model.reflection.universe.RuntimeUniverse.{DependencyContext, _}
++import com.github.pshirshov.izumi.distage.model.reflection.universe.{MacroUniverse, RuntimeUniverse}
+ import com.github.pshirshov.izumi.fundamentals.reflection.AnnotationTools
+ 
+-class DependencyKeyProviderDefaultImpl extends DependencyKeyProvider {
++trait DependencyKeyProviderDefaultImpl {
++  this: DependencyKeyProvider =>
++  import u._
++  import u.u._
++
+   // TODO: named dependencies
+-  override def keyFromParameter(context: DependencyContext.ParameterContext, parameterSymbol: RuntimeUniverse.TypeSymb): RuntimeUniverse.DIKey = {
+-    val typeKey = DIKey.TypeKey(RuntimeUniverse.SafeType(parameterSymbol.typeSignature))
++  override def keyFromParameter(context: DependencyContext.ParameterContext, parameterSymbol: TypeSymb): DIKey = {
++    val typeKey = DIKey.TypeKey(SafeType(parameterSymbol.typeSignature))
+ 
+     withOptionalName(parameterSymbol, typeKey)
+   }
+ 
+-  override def keyFromMethod(context: DependencyContext.MethodContext, methodSymbol: RuntimeUniverse.MethodSymb): RuntimeUniverse.DIKey = {
+-    val typeKey = DIKey.TypeKey(RuntimeUniverse.SafeType(methodSymbol.typeSignatureIn(context.definingClass.tpe).finalResultType))
++  override def keyFromMethod(context: DependencyContext.MethodContext, methodSymbol: MethodSymb): DIKey = {
++    val typeKey = DIKey.TypeKey(SafeType(methodSymbol.typeSignatureIn(context.definingClass.tpe).finalResultType))
+     withOptionalName(methodSymbol, typeKey)
+-
+   }
+ 
+-  private def withOptionalName(parameterSymbol: RuntimeUniverse.TypeSymb, typeKey: DIKey.TypeKey) = {
+-    AnnotationTools.find[RuntimeUniverse.u.type, Id](parameterSymbol)
++  private def withOptionalName(parameterSymbol: TypeSymb, typeKey: DIKey.TypeKey) = {
++    AnnotationTools.find[u.u.type, Id](parameterSymbol)
+       .flatMap {
+         ann =>
+           ann.tree.children.tail
+             .collect {
+-              case l: RuntimeUniverse.u.LiteralApi =>
++              case l: LiteralApi =>
+                 l.value
+             }
+             .collectFirst {
+-              case RuntimeUniverse.u.Constant(name: String) =>
++              case Constant(name: String) =>
+                 name
+             }
+       } match {
+@@ -42,21 +44,25 @@ class DependencyKeyProviderDefaultImpl extends DependencyKeyProvider {
+     }
+   }
+ 
+-  override def keyFromType(parameterType: RuntimeUniverse.TypeFull): RuntimeUniverse.DIKey = {
++  override def keyFromType(parameterType: TypeFull): DIKey = {
+     DIKey.TypeKey(parameterType)
+   }
+ }
+ 
+-//object DependencyKeyProviderDefaultImpl {
+-//  type Java = DependencyKeyProviderDefaultImpl[universe.type]
+-//
+-//  object Java {
+-//    final val instance: DependencyKeyProviderDefaultImpl.Java = new DependencyKeyProviderDefaultImpl[universe.type](universe)
+-//  }
+-//
+-//  object Macro {
+-//    def instance(c: blackbox.Context): DependencyKeyProviderDefaultImpl[c.universe.type] =
+-//      new DependencyKeyProviderDefaultImpl[c.universe.type](c.universe)
+-//  }
+-//}
++object DependencyKeyProviderDefaultImpl {
++
++  class Java
++    extends DependencyKeyProvider.Java
++       with DependencyKeyProviderDefaultImpl {
++    override val u: RuntimeUniverse.type = RuntimeUniverse
++  }
++
++  class Macro[M <: MacroUniverse[_]](macroUniverse: M)
++    extends DependencyKeyProvider.Macro[M](macroUniverse)
++       with DependencyKeyProviderDefaultImpl
++  object Macro {
++    def instance[M <: MacroUniverse[_]](macroUniverse: M): Macro[macroUniverse.type] =
++      new Macro(macroUniverse)
++  }
++}
+ 
+diff --git a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderDefaultImpl.scala b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderDefaultImpl.scala
+index fee4048..171ec07 100644
+--- a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderDefaultImpl.scala
++++ b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/ReflectionProviderDefaultImpl.scala
+@@ -10,7 +10,7 @@ import com.github.pshirshov.izumi.fundamentals.reflection.AnnotationTools
+ 
+ 
+ class ReflectionProviderDefaultImpl(
+-                                     keyProvider: DependencyKeyProvider
++                                     keyProvider: DependencyKeyProvider.Java
+                                      , symbolIntrospector: SymbolIntrospector.Java
+                                    ) extends ReflectionProvider.Java {
+   import u._
+diff --git a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/SymbolIntrospectorDefaultImpl.scala b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/SymbolIntrospectorDefaultImpl.scala
+index 43fa0cc..2030cf1 100644
+--- a/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/SymbolIntrospectorDefaultImpl.scala
++++ b/distage/distage-macro/src/main/scala/com/github/pshirshov/izumi/distage/reflection/SymbolIntrospectorDefaultImpl.scala
+@@ -62,7 +62,7 @@ object SymbolIntrospectorDefaultImpl {
+ 
+   class Java
+     extends SymbolIntrospector.Java
+-      with SymbolIntrospectorDefaultImpl
++       with SymbolIntrospectorDefaultImpl
+   object Java {
+     final val instance = new SymbolIntrospectorDefaultImpl.Java
+   }
+diff --git a/distage/distage-model/src/main/scala/com/github/pshirshov/izumi/distage/model/reflection/DependencyKeyProvider.scala b/distage/distage-model/src/main/scala/com/github/pshirshov/izumi/distage/model/reflection/DependencyKeyProvider.scala
+index 73deecd..2eca953 100644
+--- a/distage/distage-model/src/main/scala/com/github/pshirshov/izumi/distage/model/reflection/DependencyKeyProvider.scala
++++ b/distage/distage-model/src/main/scala/com/github/pshirshov/izumi/distage/model/reflection/DependencyKeyProvider.scala
+@@ -1,12 +1,23 @@
+ package com.github.pshirshov.izumi.distage.model.reflection
+ 
+-import com.github.pshirshov.izumi.distage.model.reflection.universe.RuntimeUniverse
+-
++import com.github.pshirshov.izumi.distage.model.reflection.universe.{DIUniverse, MacroUniverse, RuntimeUniverse}
+ 
+ trait DependencyKeyProvider {
+-  def keyFromParameter(context: RuntimeUniverse.DependencyContext.ParameterContext, parameterSymbol: RuntimeUniverse.TypeSymb): RuntimeUniverse.DIKey
++  val u: DIUniverse
++
++  def keyFromParameter(context: u.DependencyContext.ParameterContext, parameterSymbol: u.TypeSymb): u.DIKey
++
++  def keyFromMethod(context: u.DependencyContext.MethodContext, methodSymbol: u.MethodSymb): u.DIKey
++
++  def keyFromType(parameterSymbol: u.TypeFull): u.DIKey
++}
++
++object DependencyKeyProvider {
++
++  trait Java extends DependencyKeyProvider {
++    val u: RuntimeUniverse.type = RuntimeUniverse
++  }
+ 
+-  def keyFromMethod(context: RuntimeUniverse.DependencyContext.MethodContext, methodSymbol: RuntimeUniverse.MethodSymb): RuntimeUniverse.DIKey
++  abstract class Macro[+M <: MacroUniverse[_]](override val u: M) extends DependencyKeyProvider
+ 
+-  def keyFromType(parameterSymbol: RuntimeUniverse.TypeFull): RuntimeUniverse.DIKey
+ }
+-- 
+2.10.1
+
