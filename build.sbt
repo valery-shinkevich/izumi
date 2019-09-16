@@ -53,6 +53,11 @@ val GlobalSettings = new DefaultGlobalSettingsGroup {
       s"-Xmacro-settings:scala-version=${scalaVersion.value}",
       s"-Xmacro-settings:scalatest-version=${V.scalatest}",
     ),
+    publishTo := (if (!isSnapshot.value) {
+      sonatypePublishToBundle.value
+    } else {
+      Some(Opts.resolver.sonatypeSnapshots)
+    }),
   )
 }
 
